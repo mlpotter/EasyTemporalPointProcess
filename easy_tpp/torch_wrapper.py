@@ -103,6 +103,8 @@ class TorchModelWrapper:
         """
 
         batch = batch.to(self.device).values()
+        # batch = tuple(t.to(torch.float32) if t.dtype == torch.float64 else t for t in batch)
+        # batch = tuple(t.to(torch.int64) if t.dtype == torch.int64 else t for t in batch)
         if phase in (RunnerPhase.TRAIN, RunnerPhase.VALIDATE):
             # set mode to train
             is_training = (phase == RunnerPhase.TRAIN)

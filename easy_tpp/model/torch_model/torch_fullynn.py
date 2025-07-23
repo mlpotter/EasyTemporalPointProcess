@@ -19,6 +19,7 @@ class CumulHazardFunctionNetwork(nn.Module):
         self.num_event_types = model_config.num_event_types
         self.proper_marked_intensities = model_config.model_specs["proper_marked_intensities"]
         self.use_ln = model_config.use_ln
+        self.bias_term = nn.Parameter(torch.ones(self.num_event_types,))
         # transform inter-event time embedding
         self.layer_dense_1 = nn.Linear(in_features=1, out_features=self.hidden_size)
 
@@ -53,8 +54,8 @@ class CumulHazardFunctionNetwork(nn.Module):
         time_delta_seqs.requires_grad_(True)
 
         # [batch_size, seq_len, hidden_size]
-        # t = self.layer_dense_1(time_delta_seqs.unsqueeze(dim=-1))  # [batch_size, seq_len, hidden_size]
-        t = self.layer_dense_1(torch.log(time_delta_seqs.unsqueeze(dim=-1) + 1e-8)) if self.use_ln else self.layer_dense_1(time_delta_seqs.unsqueeze(dim=-1))  # [batch_size, seq_len, hidden_size]
+        t = self.layer_dense_1(time_delta_seqs.unsqueeze(dim=-1))  # [batch_size, seq_len, hidden_size]
+        # t = self.layer_dense_1(torch.log(time_delta_seqs.unsqueeze(dim=-1) + 1e-8)) if self.use_ln else self.layer_dense_1(time_delta_seqs.unsqueeze(dim=-1))  # [batch_size, seq_len, hidden_size]
         
         # t = time_delta_seqs.unsqueeze(dim=-1)
 
@@ -64,7 +65,7 @@ class CumulHazardFunctionNetwork(nn.Module):
             out = torch.tanh(layer(out))
 
         # [batch_size, seq_len, num_event_types]
-        integral_lambda = self.layer_dense_3(out) #+ F.softplus(self.bias_param * time_delta_seqs.unsqueeze(dim=-1))
+        integral_lambda = self.layer_dense_3(out) + self.bias_term * time_delta_seqs.unsqueeze(dim=-1)#+ F.softplus(self.bias_param * time_delta_seqs.unsqueeze(dim=-1))
         # print(integral_lambda.shape, time_delta_seqs.shape)
         # [batch_size, seq_len, num_event_types]
         if self.proper_marked_intensities:

@@ -34,6 +34,7 @@ class TensorType(ExplicitEnum):
     """
 
     PYTORCH = "pt"
+    TENSORFLOW = "tf"
     NUMPY = "np"
 
 
@@ -84,7 +85,9 @@ class TruncationStrategy(ExplicitEnum):
 
 class Backend(ExplicitEnum):
     """
-    Possible values for the `backend` argument in configuration.
+    Possible values for the `truncation` argument in [`EventTokenizer.__call__`]. Useful for tab-completion in
+    an IDE.
     """
 
     Torch = 'torch'
+    TF = 'tensorflow'

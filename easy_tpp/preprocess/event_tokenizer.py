@@ -61,12 +61,15 @@ class BatchEncoding(UserDict):
             prepend_batch_axis (`int`, *optional*, defaults to `False`):
                 Whether or not to add the batch dimension during the conversion.
         """
+        # print(tensor_type)
+        # print(TensorType.__members__)
         if tensor_type is None:
             return self
 
         # Convert to TensorType
         if not isinstance(tensor_type, TensorType):
             tensor_type = TensorType(tensor_type)
+        # print(TensorType.__members__)
 
         # Get a function reference for the correct framework
         if tensor_type == TensorType.TENSORFLOW:
