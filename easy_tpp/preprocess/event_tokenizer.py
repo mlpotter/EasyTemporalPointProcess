@@ -4,7 +4,7 @@ from typing import Optional, Union, Dict, Any, List, Mapping
 
 import numpy as np
 
-from easy_tpp.utils import logger, TruncationStrategy, PaddingStrategy, \
+from easy_tpp.utils import is_torch_available, is_tf_available, logger, TruncationStrategy, PaddingStrategy, \
     TensorType, is_torch_device, requires_backends, is_numpy_array, py_assert
 
 
@@ -69,7 +69,18 @@ class BatchEncoding(UserDict):
             tensor_type = TensorType(tensor_type)
 
         # Get a function reference for the correct framework
-        if tensor_type == TensorType.PYTORCH:
+        if tensor_type == TensorType.TENSORFLOW:
+            if not is_tf_available():
+                raise ImportError(
+                    "Unable to convert output to TensorFlow tensors format, TensorFlow is not installed."
+                )
+            import tensorflow as tf
+
+            as_tensor = tf.constant
+            is_tensor = tf.is_tensor
+        elif tensor_type == TensorType.PYTORCH:
+            if not is_torch_available():
+                raise ImportError("Unable to convert output to PyTorch tensors format, PyTorch is not installed.")
             import torch
 
             as_tensor = torch.tensor
@@ -100,6 +111,10 @@ class BatchEncoding(UserDict):
                     f" features (`{key}` in this case) have excessive nesting (inputs type `list` where type `int` is"
                     " expected)."
                 ) from e
+
+        self['time_seqs'] = self['time_seqs'].to(torch.float32)
+        self['time_delta_seqs'] = self['time_delta_seqs'].to(torch.float32)
+        self['type_seqs'] = self['type_seqs'].to(torch.int64)
 
         return self
 
@@ -403,9 +418,9 @@ class EventTokenizer:
                                                                              max_len=max_length,
                                                                              dtype=np.int64)
         else:
-            batch_output[self.model_input_names[0]] = np.array(encoded_inputs[self.model_input_names[0]], dtype=np.float32)
-            batch_output[self.model_input_names[1]] = np.array(encoded_inputs[self.model_input_names[1]], dtype=np.float32)
-            batch_output[self.model_input_names[2]] = np.array(encoded_inputs[self.model_input_names[2]], dtype=np.int64)
+            batch_output[self.model_input_names[0]] = np.array(encoded_inputs[self.model_input_names[0]])
+            batch_output[self.model_input_names[1]] = np.array(encoded_inputs[self.model_input_names[1]])
+            batch_output[self.model_input_names[2]] = np.array(encoded_inputs[self.model_input_names[2]])
 
         # non_pad_mask; replaced the use of event types by using the original sequence length
         seq_pad_mask = np.full_like(batch_output[self.model_input_names[2]], fill_value=True, dtype=bool)
