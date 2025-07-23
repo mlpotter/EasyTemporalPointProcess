@@ -53,8 +53,8 @@ class CumulHazardFunctionNetwork(nn.Module):
         time_delta_seqs.requires_grad_(True)
 
         # [batch_size, seq_len, hidden_size]
-        t = self.layer_dense_1(time_delta_seqs.unsqueeze(dim=-1))  # [batch_size, seq_len, hidden_size]
-        # t = self.layer_dense_1(torch.log(time_delta_seqs.unsqueeze(dim=-1) + 1e-16)) if self.use_ln else self.layer_dense_1(time_delta_seqs.unsqueeze(dim=-1))  # [batch_size, seq_len, hidden_size]
+        # t = self.layer_dense_1(time_delta_seqs.unsqueeze(dim=-1))  # [batch_size, seq_len, hidden_size]
+        t = self.layer_dense_1(torch.log(time_delta_seqs.unsqueeze(dim=-1) + 1e-8)) if self.use_ln else self.layer_dense_1(time_delta_seqs.unsqueeze(dim=-1))  # [batch_size, seq_len, hidden_size]
         
         # t = time_delta_seqs.unsqueeze(dim=-1)
 
@@ -156,9 +156,9 @@ class FullyNN(TorchBaseModel):
         #                        ), dim=-1)
         
         
-        time_delta_seqs_log = torch.log(time_delta_seqs.unsqueeze(-1) + 1e-16) if self.use_ln else time_delta_seqs.unsqueeze(-1)
+        time_delta_seqs_log = torch.log(time_delta_seqs.unsqueeze(-1) + 1e-8) if self.use_ln else time_delta_seqs.unsqueeze(-1)
 
-        time_seqs_log = torch.log(time_seqs.unsqueeze(-1) + 1e-16) if self.use_ln else time_seqs.unsqueeze(-1)
+        time_seqs_log = torch.log(time_seqs.unsqueeze(-1) + 1e-8) if self.use_ln else time_seqs.unsqueeze(-1)
 
         input_embed = self.layer_input_projection(time_delta_seqs_log)  # [batch_size, seq_len, hidden_size * num_heads]
 
