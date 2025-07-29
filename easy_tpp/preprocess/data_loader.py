@@ -84,7 +84,8 @@ class TPPDataLoader:
         return {
             'time_seqs': data['time_since_start'],
             'type_seqs': data['type_event'],
-            'time_delta_seqs': data['time_since_last_event']
+            'time_delta_seqs': data['time_since_last_event'],
+            'len_seqs': data['seq_len']
         }
 
     def get_loader(self, split='train', **kwargs):

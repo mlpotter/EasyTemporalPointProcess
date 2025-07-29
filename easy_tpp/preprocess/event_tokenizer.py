@@ -118,6 +118,8 @@ class BatchEncoding(UserDict):
         self['time_seqs'] = self['time_seqs'].to(torch.float32)
         self['time_delta_seqs'] = self['time_delta_seqs'].to(torch.float32)
         self['type_seqs'] = self['type_seqs'].to(torch.int64)
+        self['len_seqs'] = self['len_seqs'].to(torch.int64)
+
 
         return self
 
@@ -149,7 +151,7 @@ class EventTokenizer:
     """
     padding_side: str = "right"
     truncation_side: str = "right"
-    model_input_names: List[str] = ["time_seqs", "time_delta_seqs", "type_seqs", "seq_non_pad_mask", "attention_mask"]
+    model_input_names: List[str] = ["time_seqs", "time_delta_seqs", "type_seqs", "seq_non_pad_mask", "attention_mask", "len_seqs"]
 
     def __init__(self, config):
         config = copy.deepcopy(config)
@@ -354,6 +356,9 @@ class EventTokenizer:
             padding_strategy=padding_strategy,
             return_attention_mask=return_attention_mask,
         )
+
+        batch_output[self.model_input_names[5]] = np.array([encoded_inputs['len_seqs']]).ravel()
+
 
         return BatchEncoding(batch_output, tensor_type=return_tensors)
 

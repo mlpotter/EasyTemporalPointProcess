@@ -155,7 +155,13 @@ class TimeShiftedPositionalEncoding(nn.Module):
         # [model_dim //2 ]
         div_term = (torch.arange(0, d_model, 2, device=device).float() * -(math.log(10000.0) / d_model)).exp()
 
-        self.layer_time_delta = nn.Linear(1, d_model // 2, bias=False)
+        self.layer_time_delta = nn.Linear(1, d_model // 2, bias=True)
+
+        # create offset for t=0, where we want to subtract the pe by pe at t=0
+        # this is the same as subtracting the pe at t=0 from all other time
+        # positions, so we can just use the position vector
+        # self.pe_offset = torch.cat((torch.zeros(d_model//2, device=device),
+                                        #    torch.ones(d_model//2, device=device)), dim=0).unsqueeze(0).unsqueeze(0)
 
         self.register_buffer('position', position)
         self.register_buffer('div_term', div_term)
@@ -182,7 +188,7 @@ class TimeShiftedPositionalEncoding(nn.Module):
 
         pe_sin = torch.sin(arc + phi)
         pe_cos = torch.cos(arc + phi)
-        pe = torch.cat([pe_sin, pe_cos], dim=-1)
+        pe = torch.cat([pe_sin, pe_cos], dim=-1) #- self.pe_offset
 
         return pe
 

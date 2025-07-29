@@ -15,6 +15,7 @@ class TPPDataset(Dataset):
         self.time_seqs = self.data_dict['time_seqs']
         self.time_delta_seqs = self.data_dict['time_delta_seqs']
         self.type_seqs = self.data_dict['type_seqs']
+        self.len_seqs = self.data_dict['len_seqs']
 
     def __len__(self):
         """
@@ -23,10 +24,10 @@ class TPPDataset(Dataset):
 
         """
 
-        py_assert(len(self.time_seqs) == len(self.type_seqs) and len(self.time_delta_seqs) == len(self.type_seqs),
+        py_assert(len(self.time_seqs) == len(self.type_seqs) and len(self.time_delta_seqs) == len(self.type_seqs) and len(self.time_seqs) == len(self.len_seqs),
                   ValueError,
                   f"Inconsistent lengths for data! time_seq_len:{len(self.time_seqs)}, event_len: "
-                  f"{len(self.type_seqs)}, time_delta_seq_len: {len(self.time_delta_seqs)}")
+                  f"{len(self.type_seqs)}, time_delta_seq_len: {len(self.time_delta_seqs)}, len_seq_len: {len(self.len_seqs)}")
 
         return len(self.time_seqs)
 
@@ -41,7 +42,7 @@ class TPPDataset(Dataset):
 
         """
         return dict({'time_seqs': self.time_seqs[idx], 'time_delta_seqs': self.time_delta_seqs[idx],
-                     'type_seqs': self.type_seqs[idx]})
+                     'type_seqs': self.type_seqs[idx], 'len_seqs': self.len_seqs[idx]})
 
     def to_tf_dataset(self, data_collator: TPPDataCollator, **kwargs):
         """Generate a dataset to use in Tensorflow

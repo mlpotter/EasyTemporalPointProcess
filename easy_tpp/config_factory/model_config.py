@@ -207,6 +207,7 @@ class ModelConfig(Config):
         self.loss_integral_num_sample_per_step = kwargs.get('loss_integral_num_sample_per_step', 20)  # mc_num_sample_per_step
         self.dropout_rate = kwargs.get('dropout_rate', 0.0)
         self.use_ln = kwargs.get('use_ln', False)
+        self.right_censoring = kwargs.get('right_censoring', False)  # whether to use right censoring
         self.thinning = ThinningConfig.parse_from_yaml_config(kwargs.get('thinning'))
         self.is_training = kwargs.get('training', False)
         self.num_event_types_pad = kwargs.get('num_event_types_pad', None)
@@ -231,6 +232,7 @@ class ModelConfig(Config):
                 'loss_integral_num_sample_per_step': self.loss_integral_num_sample_per_step,
                 'dropout_rate': self.dropout_rate,
                 'use_ln': self.use_ln,
+                'right_censoring': self.right_censoring,
                 # for some models / cases we may not need to pass thinning config
                 # e.g., for intensity-free model
                 'thinning': None if self.thinning is None else self.thinning.get_yaml_config(),
@@ -268,6 +270,7 @@ class ModelConfig(Config):
                            loss_integral_num_sample_per_step=self.loss_integral_num_sample_per_step,
                            dropout_rate=self.dropout_rate,
                            use_ln=self.use_ln,
+                           right_censoring=self.right_censoring,
                            thinning=self.thinning,
                            num_event_types_pad=self.num_event_types_pad,
                            num_event_types=self.num_event_types,

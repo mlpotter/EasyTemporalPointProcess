@@ -111,7 +111,7 @@ class TorchModelWrapper:
             self.model.train(is_training)
 
             # FullyRNN needs grad event in validation stage
-            grad_flag = is_training if not self.model_id == 'FullyNN' else True
+            grad_flag = is_training if not self.model_id in ['FullyNN', 'FullyNNTransformer'] else True
             # run model
             with torch.set_grad_enabled(grad_flag):
                 loss, num_event = self.model.loglike_loss(batch)

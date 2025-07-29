@@ -94,8 +94,10 @@ class RunnerConfig(Config):
         log_folder = create_folder(self.base_config.base_dir, model_folder_name)
         model_folder = create_folder(log_folder, 'models')
 
+        model_id = self.base_config.model_id
+
         self.base_config.specs['log_folder'] = log_folder
-        self.base_config.specs['saved_model_dir'] = os.path.join(model_folder, 'saved_model')
+        self.base_config.specs['saved_model_dir'] = os.path.join(model_folder, model_id+'_saved_model')
         self.base_config.specs['saved_log_dir'] = os.path.join(log_folder, 'log')
         self.base_config.specs['output_config_dir'] = os.path.join(log_folder,
                                                                    f'{self.base_config.exp_id}_output.yaml')
