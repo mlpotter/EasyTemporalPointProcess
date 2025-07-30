@@ -33,6 +33,8 @@ class CumulHazardFunctionNetwork(nn.Module):
                                                      out_features=self.num_event_types),
                                            nn.Softplus())
 
+        self.bias_term = nn.Linear(in_features=model_config.hidden_size,out_features=1,bias=True)
+
         self.params_eps = torch.finfo(torch.float32).eps  # ensure positiveness of parameters
 
         self.init_weights_positive()
@@ -56,8 +58,18 @@ class CumulHazardFunctionNetwork(nn.Module):
         for layer in self.module_list:
             out = torch.tanh(layer(out))
 
+        t_base = self.layer_dense_1(torch.zeros_like(time_delta_seqs.unsqueeze(dim=-1),device=time_delta_seqs.device))  # [batch_size, seq_len, hidden_size]
+
+        # [batch_size, seq_len, hidden_size]
+        out_base = torch.tanh(self.layer_dense_2(torch.cat([hidden_states, t_base], dim=-1)))
+        for layer in self.module_list:
+            out_base = torch.tanh(layer(out_base))
+
+        out_bias = F.relu(self.bias_term(hidden_states))  # [batch_size, seq_len, 1]
+
+
         # [batch_size, seq_len, num_event_types]
-        integral_lambda = self.layer_dense_3(out)
+        integral_lambda = self.layer_dense_3(out) - self.layer_dense_3(out_base) + out_bias * time_delta_seqs.unsqueeze(dim=-1)
 
         # [batch_size, seq_len, num_event_types]
         if self.proper_marked_intensities:
@@ -70,7 +82,7 @@ class CumulHazardFunctionNetwork(nn.Module):
             derivative_integral_lambda = torch.stack(derivative_integral_lambdas, dim=-1)  # TODO: Check that it is okay to iterate over marks like this
         else:
             derivative_integral_lambda = grad(
-                integral_lambda.sum(dim=-1).sum(),
+                integral_lambda.sum(),
                 time_delta_seqs,
                 create_graph=True, retain_graph=True)[0]
             derivative_integral_lambda = derivative_integral_lambda.unsqueeze(-1).expand(*derivative_integral_lambda.shape, self.num_event_types) / self.num_event_types
@@ -101,13 +113,15 @@ class FullyNNModified(TorchBaseModel):
         self.dropout_rate = model_config.dropout_rate
         for sub_rnn_class in self.rnn_list:
             if sub_rnn_class.__name__ == self.rnn_type:
-                self.layer_rnn = sub_rnn_class(input_size=1 + self.hidden_size,
-                                               hidden_size=self.hidden_size,
-                                               num_layers=self.n_layers,
-                                               batch_first=True,
-                                               dropout=self.dropout_rate)
+                self.layer_rnn = sub_rnn_class(input_size=1,
+                                                hidden_size=self.hidden_size,
+                                                num_layers=self.n_layers,
+                                                batch_first=True,
+                                                dropout=self.dropout_rate)
 
         self.layer_intensity = CumulHazardFunctionNetwork(model_config)
+        self.use_ln = model_config.use_ln
+        self.right_censoring = model_config.right_censoring
 
     def forward(self, time_seqs, time_delta_seqs, type_seqs):
         """Call the model
@@ -121,10 +135,13 @@ class FullyNNModified(TorchBaseModel):
             tensor: hidden states at event times.
         """
         # [batch_size, seq_len, hidden_size]
-        type_embedding = self.layer_type_emb(type_seqs)
+
+        time_delta_seqs_log = torch.log(time_delta_seqs.unsqueeze(-1) + 1e-6) if self.use_ln else time_delta_seqs.unsqueeze(-1)
+
+        time_seqs_log = torch.log(time_seqs.unsqueeze(-1) + 1e-6) if self.use_ln else time_seqs.unsqueeze(-1)
 
         # [batch_size, seq_len, hidden_size + 1]
-        rnn_input = torch.cat((type_embedding, time_delta_seqs.unsqueeze(-1)), dim=-1)
+        rnn_input = time_delta_seqs_log
 
         # [batch_size, seq_len, hidden_size]
         # states right after the event
@@ -142,7 +159,7 @@ class FullyNNModified(TorchBaseModel):
             list: loglike loss, num events.
         """
         # [batch_size, seq_len]
-        time_seqs, time_delta_seqs, type_seqs, batch_non_pad_mask, _ , _ = batch
+        time_seqs, time_delta_seqs, type_seqs, batch_non_pad_mask, _ , batch_len_seqs = batch
 
         # [batch_size, seq_len, hidden_size]
         hidden_states = self.forward(
@@ -158,6 +175,10 @@ class FullyNNModified(TorchBaseModel):
 
         # Compute components for each LL term
         log_marked_event_lambdas = derivative_integral_lambda.log()
+
+        # If right censoring is used, we need to handle the last event in nll_loss
+        if self.right_censoring:
+            type_seqs[torch.arange(len(batch_len_seqs)), batch_len_seqs-1] = self.pad_token_id
 
         # Compute event LL - [batch_size, seq_len]
         event_ll = -F.nll_loss(
