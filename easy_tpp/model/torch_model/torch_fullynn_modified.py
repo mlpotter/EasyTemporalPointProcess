@@ -78,7 +78,7 @@ class CumulHazardFunctionNetwork(nn.Module):
         return integral_lambda, derivative_integral_lambda
 
 
-class FullyNN(TorchBaseModel):
+class FullyNNModified(TorchBaseModel):
     """Torch implementation of
         Fully Neural Network based Model for General Temporal Point Processes, NeurIPS 2019.
         https://arxiv.org/abs/1905.09690
@@ -93,7 +93,7 @@ class FullyNN(TorchBaseModel):
         Args:
             model_config (EasyTPP.ModelConfig): config of model specs.
         """
-        super(FullyNN, self).__init__(model_config)
+        super(FullyNNModified, self).__init__(model_config)
 
         self.rnn_type = model_config.rnn_type
         self.rnn_list = [nn.LSTM, nn.RNN, nn.GRU]
