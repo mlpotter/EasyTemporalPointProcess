@@ -168,9 +168,9 @@ class FullyNNTransformer(TorchBaseModel):
         #                        ), dim=-1)
         
         
-        time_delta_seqs_log = torch.log(time_delta_seqs.unsqueeze(-1) + 1e-6) if self.use_ln else time_delta_seqs.unsqueeze(-1)
+        time_delta_seqs_log = torch.log(time_delta_seqs.unsqueeze(-1) + 1e-16) if self.use_ln else time_delta_seqs.unsqueeze(-1)
 
-        time_seqs_log = torch.log(time_seqs.unsqueeze(-1) + 1e-6) if self.use_ln else time_seqs.unsqueeze(-1)
+        time_seqs_log = torch.log(time_seqs.unsqueeze(-1) + 1e-16) if self.use_ln else time_seqs.unsqueeze(-1)
 
         input_embed = self.layer_input_projection(time_delta_seqs_log)  # [batch_size, seq_len, hidden_size * num_heads]
 

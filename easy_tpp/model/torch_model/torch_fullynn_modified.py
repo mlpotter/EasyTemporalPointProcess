@@ -53,6 +53,8 @@ class CumulHazardFunctionNetwork(nn.Module):
         # [batch_size, seq_len, hidden_size]
         t = self.layer_dense_1(time_delta_seqs.unsqueeze(dim=-1))
 
+        # t = torch.tanh(t)
+
         # [batch_size, seq_len, hidden_size]
         out = torch.tanh(self.layer_dense_2(torch.cat([hidden_states, t], dim=-1)))
         for layer in self.module_list:
@@ -60,17 +62,23 @@ class CumulHazardFunctionNetwork(nn.Module):
 
         t_base = self.layer_dense_1(torch.zeros_like(time_delta_seqs.unsqueeze(dim=-1),device=time_delta_seqs.device))  # [batch_size, seq_len, hidden_size]
 
+        # t_base = torch.tanh(t_base) # [batch_size, seq_len, hidden_size]  
+
         # [batch_size, seq_len, hidden_size]
         out_base = torch.tanh(self.layer_dense_2(torch.cat([hidden_states, t_base], dim=-1)))
         for layer in self.module_list:
             out_base = torch.tanh(layer(out_base))
 
         out_bias = F.relu(self.bias_term(hidden_states))  # [batch_size, seq_len, 1]
+        # print(self.bias_term(hidden_states))
 
-
+        # print(out_bias.min(),out_bias.max(),out_bias.mean())
         # [batch_size, seq_len, num_event_types]
         integral_lambda = self.layer_dense_3(out) - self.layer_dense_3(out_base) + out_bias * time_delta_seqs.unsqueeze(dim=-1)
-
+        # integral_lambda = self.layer_dense_3(out)*time_delta_seqs.unsqueeze(dim=-1) + out_bias * time_delta_seqs.unsqueeze(dim=-1)
+    
+        # print(self.layer_dense_3(out)[0] - self.layer_dense_3(out_base)[0], (out_bias * time_delta_seqs.unsqueeze(dim=-1))[0])
+        # print('=' * 50)
         # [batch_size, seq_len, num_event_types]
         if self.proper_marked_intensities:
             derivative_integral_lambdas = []
@@ -123,6 +131,10 @@ class FullyNNModified(TorchBaseModel):
         self.use_ln = model_config.use_ln
         self.right_censoring = model_config.right_censoring
 
+        self.h0 = nn.Parameter(torch.randn(self.n_layers, 1, self.hidden_size))
+        if self.rnn_type == "LSTM":
+            self.c0 = nn.Parameter(torch.randn(self.n_layers, 1, self.hidden_size))
+
     def forward(self, time_seqs, time_delta_seqs, type_seqs):
         """Call the model
 
@@ -135,17 +147,33 @@ class FullyNNModified(TorchBaseModel):
             tensor: hidden states at event times.
         """
         # [batch_size, seq_len, hidden_size]
+        # type_embedding = self.layer_type_emb(type_seqs)
 
-        time_delta_seqs_log = torch.log(time_delta_seqs.unsqueeze(-1) + 1e-6) if self.use_ln else time_delta_seqs.unsqueeze(-1)
+        time_delta_seqs_log = torch.log(time_delta_seqs.unsqueeze(-1) + 1e-16) if self.use_ln else time_delta_seqs.unsqueeze(-1)
 
-        time_seqs_log = torch.log(time_seqs.unsqueeze(-1) + 1e-6) if self.use_ln else time_seqs.unsqueeze(-1)
-
+        time_seqs_log = torch.log(time_seqs.unsqueeze(-1) + 1e-16) if self.use_ln else time_seqs.unsqueeze(-1)
+        
         # [batch_size, seq_len, hidden_size + 1]
+        # rnn_input = time_seqs_log
+        # rnn_input = torch.cat([time_seqs_log, time_delta_seqs_log], dim=-1)
         rnn_input = time_delta_seqs_log
 
-        # [batch_size, seq_len, hidden_size]
-        # states right after the event
-        hidden_states, _ = self.layer_rnn(rnn_input)
+        # [num_layers, batch_size, hidden_size]
+        # learned init
+        h0 = self.h0.expand(1, time_seqs.size(0), -1).contiguous()
+
+        # 
+        if self.rnn_type == "LSTM":
+            # [num_layers, batch_size, hidden_size]
+            c0 = self.c0.expand(1, time_seqs.size(0), -1).contiguous()
+
+            # [batch_size, seq_len, hidden_size]
+            # states right after the event
+            hidden_states, _ = self.layer_rnn(rnn_input, (h0, c0))
+        else:
+            # [batch_size, seq_len, hidden_size]
+            # states right after the event
+            hidden_states, _ = self.layer_rnn(rnn_input, h0)
 
         return hidden_states
 
@@ -175,15 +203,17 @@ class FullyNNModified(TorchBaseModel):
 
         # Compute components for each LL term
         log_marked_event_lambdas = derivative_integral_lambda.log()
-
+        
+        type_seqs_mod = type_seqs
         # If right censoring is used, we need to handle the last event in nll_loss
         if self.right_censoring:
-            type_seqs[torch.arange(len(batch_len_seqs)), batch_len_seqs-1] = self.pad_token_id
+            type_seqs_mod = type_seqs.clone()
+            type_seqs_mod[torch.arange(len(batch_len_seqs)), batch_len_seqs-1] = self.pad_token_id
 
         # Compute event LL - [batch_size, seq_len]
         event_ll = -F.nll_loss(
             log_marked_event_lambdas.permute(0, 2, 1),  # mark dimension needs to come second, not third to match nll_loss specs
-            target=type_seqs[:, 1:],
+            target=type_seqs_mod[:, 1:],
             ignore_index=self.pad_token_id,  # Padded events have a pad_token_id as a value
             reduction='none', # Does not aggregate, and replaces what would have been the log(marked intensity) with 0.
         )
